@@ -20,25 +20,30 @@ public class PointsCalculator {
         int totalPoints = 0;
         List<String> breakdownDetails = new ArrayList<>();
 
+        // Rule 1: Calculate points for retailer name
         totalPoints += calculateAlphanumericPoints(receipt.getRetailer());
         breakdownDetails.add(String.format("%d points - retailer name has %d alphanumeric characters",
                 totalPoints, calculateAlphanumericPoints(receipt.getRetailer())));
 
+        // Rule 2: Check if the total is a round dollar amount
         if (isRoundDollarAmount(receipt.getTotal())) {
             totalPoints += 50;
             breakdownDetails.add("50 points - total is a round dollar amount with no cents");
         }
 
+        // Rule 3: Check if the total is a multiple of 0.25
         if (isMultipleOfQuarter(receipt.getTotal())) {
             totalPoints += 25;
             breakdownDetails.add("25 points - total is a multiple of 0.25");
         }
 
+        // Rule 4: Calculate points for items
         int itemPoints = calculateItemPoints(receipt.getItems().size());
         totalPoints += itemPoints;
         breakdownDetails.add(String.format("%d points - %d items (%d pairs @ 5 points each)", itemPoints,
                 receipt.getItems().size(), itemPoints / 5));
 
+        // Rule 5: Calculate points for each item description
         for (ReceiptsData.Item item : receipt.getItems()) {
             BigDecimal itemPrice = item.getPrice();
             int descriptionPoints = calculateDescriptionPoints(item.getShortDescription(), itemPrice);
@@ -52,23 +57,15 @@ public class PointsCalculator {
             breakdownDetails.add(breakdownDetail);
         }
 
-        // Purchase date and time points
-        if (receipt.getPurchaseDateTime() != null) {
-            logger.info("PurchaseDateTime: {}", receipt.getPurchaseDateTime());
+        // Rule 6 and 7: Check if the day is odd and if the time is between 2:00 pm and 4:00 pm
+        if (isValidPurchaseDateTime(receipt.getPurchaseDateTime())) {
+            totalPoints += 6; // Rule 6
+            breakdownDetails.add("6 points - purchase day is odd");
 
-            if (isValidPurchaseDateTime(receipt.getPurchaseDateTime())) {
-                // Add points for odd day
-                totalPoints += 6;
-                breakdownDetails.add("6 points - purchase day is odd");
-
-                // Add points for business hours
-                totalPoints += 10;
-                breakdownDetails.add("10 points - time of purchase is after 2:00 pm and before 4:00 pm");
-            } else {
-                logger.error("Invalid PurchaseDateTime. Check data initialization.");
-            }
+            totalPoints += 10; // Rule 7
+            breakdownDetails.add("10 points - time of purchase is after 2:00 pm and before 4:00 pm");
         } else {
-            logger.error("PurchaseDateTime is null");
+            logger.error("Invalid PurchaseDateTime. Check data initialization.");
         }
 
         // Add the total line
@@ -104,33 +101,25 @@ public class PointsCalculator {
     }
 
     private static boolean isValidPurchaseDateTime(LocalDateTime purchaseDateTime) {
-        try {
-            boolean isDayOdd = isDayOdd(purchaseDateTime);
-            boolean isBusinessHours = isBusinessHours(purchaseDateTime);
-
-            logger.info("Day is odd: {}", isDayOdd);
-            logger.info("Is business hours: {}", isBusinessHours);
-
-            // Validate date and business hours
-            return isDayOdd && isBusinessHours;
-        } catch (Exception e) {
-            logger.error("Error validating purchase date/time: {}", e.getMessage());
-            return false;
-        }
+        return isDayOdd(purchaseDateTime) && isBusinessHours(purchaseDateTime);
     }
-
+    
     private static boolean isDayOdd(LocalDateTime localDateTime) {
         int day = localDateTime.getDayOfMonth();
         return day % 2 != 0;
     }
-
+    
     private static boolean isBusinessHours(LocalDateTime localDateTime) {
         DayOfWeek dayOfWeek = localDateTime.getDayOfWeek();
         LocalTime startTime = LocalTime.of(14, 0); // 2:00pm
         LocalTime endTime = LocalTime.of(16, 0);   // 4:00pm
-
+    
         // Consider only weekdays for business hours
         return dayOfWeek != DayOfWeek.SATURDAY && dayOfWeek != DayOfWeek.SUNDAY &&
                 localDateTime.toLocalTime().isAfter(startTime) && localDateTime.toLocalTime().isBefore(endTime);
     }
+    
+    
+    
+
 }
